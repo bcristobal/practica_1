@@ -1,0 +1,18 @@
+services:
+  integrador-datos:
+    # Construye la imagen usando el Dockerfile de la carpeta actual
+    build: . 
+    container_name: practica1_pipeline
+    
+    # VOLUMENES (Clave para la práctica):
+    # Conectamos tu carpeta actual (.) con la carpeta de trabajo del contenedor (/app)
+    # Así, cuando el script guarde el Excel en /app, aparecerá en tu ordenador.
+    volumes:
+      - .:/app
+    
+    # VARIABLES DE ENTORNO:
+    # Puedes definir aquí tu email o rutas si el script las usa desde os.getenv
+    environment:
+      - USER_EMAIL=b.cristobal@opendeusto.es
+      # Opcional: Si quisieras pasar la clave por variable en lugar de archivo
+      # - PRIVATE_KEY_EUSKALMET=...
