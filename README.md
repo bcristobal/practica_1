@@ -1,127 +1,104 @@
-# 🚗 Práctica de Integración: Pipeline de Datos Tráfico-Meteorología
+# 🚗 Práctica de Integración: Pipeline DataOps con Apache Airflow
 
-Este proyecto implementa un **pipeline de datos ETL (Extract, Transform, Load)** que integra información heterogénea procedente de dos fuentes oficiales del Gobierno Vasco: la **Dirección de Tráfico** y la **Agencia Vasca de Meteorología (Euskalmet)**.
+Este proyecto implementa una plataforma **ETL (Extract, Transform, Load)** orquestada profesionalmente para integrar datos de tráfico y meteorología del País Vasco.
 
-El objetivo es generar un dataset analítico que permita estudiar la correlación entre las condiciones climáticas y los accidentes de tráfico.
+El objetivo es generar un dataset analítico que permita estudiar la correlación entre accidentes y clima, utilizando una arquitectura moderna basada en **microservicios (Docker)** y **Apache Airflow**.
 
 ---
 
 ## 📋 Características del Proyecto
 
-* **Arquitectura:** ETL Batch (Procesamiento mensual).
+* **Arquitectura:** DataOps basada en Contenedores.
+* **Orquestación:** **Apache Airflow 2.10** gestionando el ciclo de vida del dato.
 * **Fuentes de Datos:**
-    * **API Tráfico (OpenData Euskadi):** Incidencias en tiempo real e históricas (JSON).
-    * **API Euskalmet:** Predicciones y datos meteorológicos por zonas (JSON).
-    * **Mapeo Local:** Archivo CSV (`mapping_municipios.csv`) para normalizar y cruzar ubicaciones.
-* **Transformación y Calidad:**
-    * Normalización de nombres de municipios.
-    * Filtrado de incidencias (solo tipo "Accidente").
-    * Validación de esquema y tipos de datos con **Pandera**.
-* **DataOps:** Entorno contenerizado con **Docker** para garantizar la reproducibilidad.
-* **Salida:** Reporte consolidado en formato Excel (`.xlsx`).
+    * **API Tráfico (OpenData Euskadi):** Incidencias reales.
+    * **API Euskalmet:** Predicciones meteorológicas.
+    * **Mapeo Local:** CSV para normalización de zonas.
+* **Capacidades Avanzadas:**
+    * **Backfilling:** Carga automática de datos históricos (mes completo) al activar el pipeline.
+    * **Optimización:** Consultas meteorológicas inteligentes (solo zonas afectadas).
+    * **Calidad del Dato:** Validación de esquemas con **Pandera**.
+    * **Resiliencia:** Reintentos automáticos ante fallos de red.
 
 ---
 
 ## 📂 Estructura del Proyecto
 
+La estructura sigue el estándar de Airflow en Docker:
+
 ```text
 practica_1/
-├── Apikey/
-│   ├── privateKey.pem       # (NECESARIO) Tu clave privada de Euskalmet
-│   └── publicKey.pem        # Tu clave pública
-├── main.py                  # Script principal del pipeline ETL
-├── generate_mapping.py      # Herramienta auxiliar para generar el CSV de zonas
-├── mapping_municipios.csv   # Maestro de datos para cruzar Tráfico y Clima
-├── Dockerfile               # Definición de la imagen del contenedor
-├── docker-compose.yml       # Orquestación del servicio
-├── pyproject.toml / uv.lock # Gestión de dependencias (uv)
-└── .env                     # Variables de entorno (Email, rutas)
+├── dags/                  # Lógica del Pipeline (Código Python)
+│   └── etl_trafico.py     # DAG que define el flujo ETL
+├── data/                  # Insumos estáticos
+│   └── mapping_municipios.csv  # Maestro de datos para cruces
+├── output/                # RESULTADOS (Aquí aparecen los Excel generados)
+├── Apikey/                # Secretos
+│   └── privateKey.pem     # (NECESARIO) Clave privada RSA
+├── Dockerfile             # Imagen personalizada de Airflow
+├── docker-compose.yaml    # Definición de la infraestructura (Webserver, Scheduler, DB)
+├── logs/                  # Logs de ejecución (generado automáticamente)
+├── plugins/               # Plugins de Airflow
+└── .env                   # Variables de entorno
 ```
 
 ---
 
-## 🚀 Requisitos Previos
+## 🚀 Requisitos Previos* **Docker** y **Docker Compose** instalados.
+* Clave privada (`privateKey.pem`) colocada en la carpeta `Apikey/`. Puedes generar una desde [opendata.euskadi.eus](https://opendata.euskadi.eus/euskalmet-api/-/api-de-euskalmet/).
 
-Para ejecutar este proyecto necesitas tener instalado:
+---
 
-1.  **Docker** y **Docker Compose**.
-2.  Un par de claves (pública/privada) válidas para la API de Euskalmet.
+## 🛠️ Instrucciones de Despliegue (DataOps)Sigue estos pasos estrictos para levantar la plataforma sin errores de permisos.
 
------
-
-## 🛠️ Instrucciones de Ejecución (DataOps)
-
-La forma recomendada de ejecutar el pipeline es mediante contenedores, asegurando que el entorno es idéntico al de desarrollo.
-
-### 1\. Configuración de Credenciales
-
-Asegúrate de colocar tu clave privada en la carpeta `Apikey`:
-
-  * Ruta: `practica_1/Apikey/privateKey.pem`
-
-### 2\. Configuración del Periodo (Opcional)
-
-Por defecto, el script procesa un mes específico. Si deseas cambiar las fechas, edita las constantes en `main.py`:
-
-```python
-START_DATE = datetime(2025, 11, 1)
-END_DATE = datetime(2025, 11, 30)
-```
-
-### 3\. Ejecución con Docker Compose
-
-Abre una terminal en la carpeta del proyecto y ejecuta:
+### 1. Preparación del EntornoDesde la terminal en la carpeta raíz del proyecto (`practica_1`), asegúrate de que las carpetas de trabajo tengan los permisos correctos para que Docker pueda escribir en ellas (especialmente en Linux/Mac/WSL):
 
 ```bash
-docker-compose up --build
+# Crear carpetas si no existen
+mkdir -p logs plugins output data
+
+# Asignar permisos de escritura (CRÍTICO para evitar errores de PermissionDenied)
+sudo chmod -R 777 dags logs plugins output data Apikey
+
 ```
 
-**¿Qué sucederá?**
+### 2. Construcción y ArranqueLevanta la infraestructura completa (Scheduler, Webserver, Postgres e Inicializador):
 
-1.  Docker construirá la imagen con Python 3.13 y las librerías necesarias (`pandas`, `pandera`, `requests`, `pyjwt`, etc.).
-2.  Se iniciará el contenedor `practica1_pipeline`.
-3.  El script comenzará a descargar y procesar los datos día a día.
-4.  Al finalizar, verás un mensaje de éxito y el contenedor se detendrá.
+```bash
+sudo docker compose up --build
 
-### 4\. Resultados
+```
 
-El reporte final aparecerá automáticamente en tu carpeta local (gracias al volumen montado en docker-compose) con el nombre:
+*Espera unos instantes hasta que veas en los logs que el `airflow-webserver` está escuchando.*
 
-  * 📄 `reporte_mensual_YYYYMM.xlsx`
+---
 
------
+## 🖥️ Uso de la Plataforma
+👉 **http://localhost:8080**
 
-## ⚙️ Ejecución Manual (Local)
+* **Usuario:** `admin`
+* **Contraseña:** `admin`
 
-Si prefieres ejecutarlo sin Docker, necesitarás Python 3.13 y el gestor `uv` (o pip).
+Los archivos generados aparecerán en tu carpeta local `output/` con el formato:
+📄 `reporte_diario_YYYYMMDD.xlsx`
 
-1.  Instalar dependencias:
-    ```bash
-    uv sync
-    ```
-2.  Ejecutar el script principal:
-    ```bash
-    uv run main.py
-    ```
-3.  (Opcional) Regenerar el archivo de mapeo si fuera necesario:
-    ```bash
-    uv run generate_mapping.py
-    ```
+---
 
------
+## ✅ Calidad y OptimizaciónEl pipeline incluye controles estrictos:
 
-## ✅ Calidad del Dato
+1. **Validación de Esquema (Pandera):** Cada ejecución verifica que:
+* No falten municipios (`cityTown`).
+* El tipo sea estrictamente "Accidente".
+* La temperatura esté en rangos físicos lógicos (-15ºC a 50ºC).
 
-El proyecto utiliza la librería **Pandera** para validar la integridad de los datos antes de guardarlos. Se comprueba:
 
-  * Que el campo `cityTown` (Municipio) no esté vacío.
-  * Que el `incidenceType` sea estrictamente "Accidente".
-  * Que las temperaturas (`temp_media`) estén dentro de rangos físicos lógicos (-15ºC a 50ºC).
-  * Que existan fechas válidas.
+2. **Optimización de API:**
+El script analiza los accidentes del día y **solo descarga el clima de los municipios afectados**, reduciendo las peticiones a la API de Euskalmet de ~300 a ~10 por día.
 
------
+---
 
-## 📝 Notas sobre la Optimización
+## 🧹 LimpiezaPara detener la plataforma y limpiar los contenedores:
 
-El pipeline implementa una **optimización de consultas**:
-En lugar de solicitar el clima de todos los municipios vascos cada día, el script identifica primero dónde ocurrieron los accidentes diarios y solicita información meteorológica **exclusivamente** para esas ubicaciones, reduciendo drásticamente el tiempo de ejecución y la carga sobre la API.
+```bash
+docker compose down
+```

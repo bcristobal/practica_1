@@ -17,3 +17,9 @@ uv.lock
 
 # Reports
 reports/
+
+# airflow files
+airflow.cfg
+logs/
+plugins/
+output/

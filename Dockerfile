@@ -1,22 +1,24 @@
-# 1. Imagen base de Python 3.13 (versión ligera 'slim')
-FROM python:3.13-slim
+# Usamos la imagen oficial estable más reciente (2.10.3 es la actual estable recomendada)
+# Si realmente necesitas la 3.x beta, cámbialo, pero esta es la segura para producción hoy.
+FROM apache/airflow:2.10.3
 
-# 2. Instalamos 'uv' desde su imagen oficial (más rápido que pip)
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+# Cambiamos a root para instalar utilidades del sistema si hicieran falta
+USER root
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
-# 3. Establecemos el directorio de trabajo dentro del contenedor
-WORKDIR /app
+# Volvemos al usuario airflow para instalar tus librerías de Python
+USER airflow
 
-# 4. Copiamos los archivos de definición de dependencias primero
-# Esto permite a Docker cachear las librerías si no has cambiado el uv.lock
-COPY pyproject.toml uv.lock ./
-
-# 5. Instalamos las dependencias
-# --frozen: asegura que se usen las versiones exactas del lockfile
-RUN uv sync --frozen
-
-# 6. Copiamos el resto del código (scripts, carpeta Apikey, csv, etc.)
-COPY . .
-
-# 7. Comando por defecto al ejecutar el contenedor
-CMD ["uv", "run", "main.py"]
+# Instalamos las librerías que usa tu práctica
+RUN pip install --no-cache-dir \
+    pandera \
+    openpyxl \
+    pyjwt \
+    cryptography \
+    pandas \
+    requests \
+    python-dotenv
